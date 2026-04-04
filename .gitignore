@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.env
+worker1_data/
+worker2_data/
+.DS_Store
