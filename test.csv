@@ -1,5 +1,101 @@
 item,category,price
-coffee,food,250
-laptop,electronics,30000
-water,food,20
-phone,electronics,15000
+Laptop Pro,Electronics,45000
+Coffee Arabica,Food,350
+Monitor 24,Electronics,7500
+Office Paper,Stationery,180
+Smartphone X,Electronics,22000
+Croissant,Food,45
+Mechanical Keyboard,Electronics,3200
+Green Tea,Food,120
+Desk Lamp,Home,850
+USB-C Cable,Electronics,400
+Bread,Food,25
+Gaming Mouse,Electronics,1500
+Notebook A5,Stationery,90
+External SSD,Electronics,4200
+Apple Juice,Food,65
+Bluetooth Speaker,Electronics,2800
+Milk 1L,Food,38
+Webcam HD,Electronics,1900
+Stapler,Stationery,120
+Wireless Headphones,Electronics,5400
+Chocolate Bar,Food,55
+Tablet 10,Electronics,12000
+Ballpoint Pen,Stationery,15
+Power Bank,Electronics,1100
+Pasta 500g,Food,42
+Curved Monitor,Electronics,15000
+Folder A4,Stationery,35
+Smart Watch,Electronics,8900
+Mineral Water,Food,18
+Router Wi-Fi 6,Electronics,3500
+Pencil Set,Stationery,75
+Electric Kettle,Home,1200
+Butter,Food,60
+Graphic Tablet,Electronics,9500
+Calculator,Stationery,450
+HDMI Adapter,Electronics,250
+Yogurt,Food,30
+Microphone,Electronics,4800
+Marker Blue,Stationery,25
+Toaster,Home,1100
+Cheese,Food,115
+Hard Drive 2TB,Electronics,2900
+Eraser,Stationery,10
+RAM 16GB,Electronics,2400
+Orange Juice,Food,70
+Coffee Grinder,Home,1800
+Scissors,Stationery,85
+Gaming Chair,Electronics,11000
+Eggs 10pcs,Food,55
+CPU Cooler,Electronics,1400
+Ruler 30cm,Stationery,20
+Air Purifier,Home,6500
+Cereal,Food,85
+Video Card,Electronics,32000
+Glue Stick,Stationery,30
+Coffee Maker,Home,5500
+Flour 1kg,Food,28
+Motherboard,Electronics,6200
+Correction Tape,Stationery,45
+Soundbar,Electronics,7800
+Honey,Food,160
+Case Fan,Electronics,350
+Compass,Stationery,110
+Rice 1kg,Food,48
+Power Supply 750W,Electronics,4100
+Sticky Notes,Stationery,40
+Robot Vacuum,Home,14000
+Tea Bags,Food,95
+NVMe SSD 1TB,Electronics,3600
+Sharpener,Stationery,22
+Washing Machine,Home,18000
+Sugar 1kg,Food,35
+Case ATX,Electronics,2500
+Drawing Paper,Stationery,140
+Microwave,Home,4200
+Cookies,Food,65
+Thermal Paste,Electronics,250
+Highlighter,Stationery,30
+Iron,Home,2100
+Olive Oil,Food,240
+SATA Cable,Electronics,120
+Sketchbook,Stationery,180
+Blender,Home,1600
+Salt 1kg,Food,15
+Game Controller,Electronics,2300
+Clip 10pcs,Stationery,12
+Hair Dryer,Home,1300
+Milk Chocolate,Food,48
+WiFi Dongle,Electronics,450
+Protractor,Stationery,18
+Coffee Capsule,Food,220
+Flash Drive 64GB,Electronics,350
+Magnifying Glass,Stationery,95
+Kitchen Scale,Home,550
+Buckwheat,Food,45
+Laptop Stand,Electronics,1200
+Calculator Scientific,Stationery,850
+Toaster 2-slice,Home,950
+Baguette,Food,32
+Network Switch,Electronics,1800

@@ -1,10 +1,14 @@
 from fastapi import FastAPI
-import httpx  
+import httpx
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("Rodentia.Master")
 
 app = FastAPI()
 
 workers = []
-file_metadata = {} 
+file_metadata = {}
 
 @app.get("/")
 def index():
@@ -28,17 +32,7 @@ def record_fragment(filename: str, worker_url: str, fragment_name: str):
 def get_metadata():
     return file_metadata
 
-@app.post("/run-map")
-async def run_map_across_cluster(task_type: str = "count"):
-    responses = []
-    async with httpx.AsyncClient() as client:
-        for worker_url in workers:
-            try:
-                resp = await client.post(f"{worker_url}/map?task_type={task_type}")
-                responses.append(resp.json())
-            except Exception as e:
-                responses.append({"worker": worker_url, "error": str(e)})
-    return {"message": "Cluster Map initiated", "details": responses}
+
 
 @app.post("/run-map")
 async def run_map_across_cluster(task_type: str = "sum", column: str = "price"):
@@ -46,16 +40,54 @@ async def run_map_across_cluster(task_type: str = "sum", column: str = "price"):
     async with httpx.AsyncClient() as client:
         for worker_url in workers:
             try:
-                resp = await client.post(f"{worker_url}/map?task_type={task_type}&column={column}")
-                
+                resp = await client.post(
+                    f"{worker_url}/map?task_type={task_type}&column={column}", 
+                    timeout=10.0
+                )
                 if resp.status_code == 200:
                     responses.append(resp.json())
                 else:
-                    responses.append({"worker": worker_url, "error": f"Worker returned {resp.status_code}"})
+                    logger.error(f"Воркер {worker_url} повернув {resp.status_code}")
+                    responses.append({"worker": worker_url, "error": f"Status {resp.status_code}"})
             except Exception as e:
+                logger.error(f"Помилка зв'язку з {worker_url}: {e}")
                 responses.append({"worker": worker_url, "error": str(e)})
     
     return {"message": "Cluster Map initiated", "details": responses}
+
+
+
+@app.post("/run-reduce")
+async def run_reduce_across_cluster(task_type: str = "sum"):
+    final_val = 0.0 if task_type != "max" else -float('inf')
+    total_count = 0
+    details = []
+    
+    async with httpx.AsyncClient() as client:
+        for worker_url in workers:
+            try:
+                resp = await client.get(f"{worker_url}/get-results", timeout=10.0)
+                if resp.status_code == 200:
+                    worker_data = resp.json().get("results", [])
+                    for res in worker_data:
+                        val = res["val"]
+                        count = res["count"]
+                        
+                        if task_type == "max":
+                            final_val = max(final_val, val)
+                        else: 
+                            final_val += val
+                        total_count += count
+                    
+                    details.append({"worker": worker_url, "status": "ok"})
+                    await client.delete(f"{worker_url}/cleanup") 
+            except Exception as e:
+                logger.error(f"Error on {worker_url}: {e}")
+    
+    if task_type == "mean" and total_count > 0:
+        final_val = final_val / total_count
+
+    return {"final_result": final_val, "task": task_type, "breakdown": details}
 
 @app.delete("/reset")
 async def reset_cluster():
@@ -65,34 +97,6 @@ async def reset_cluster():
         for worker_url in workers:
             try:
                 await client.delete(f"{worker_url}/cleanup")
-            except:
+            except Exception:
                 pass
     return {"message": "Cluster reset successful"}
-
-@app.post("/run-reduce")
-async def run_reduce_across_cluster():
-    total_sum = 0
-    details = []
-    
-    if not workers:
-        return {"final_result": 0, "message": "No active workers", "breakdown": []}
-
-    async with httpx.AsyncClient() as client:
-        for worker_url in workers:
-            try:
-                resp = await client.get(f"{worker_url}/get-results")
-                if resp.status_code == 200:
-                    data = resp.json()
-                    worker_sum = sum(data.get("results", []))
-                    total_sum += worker_sum
-                    details.append({"worker": worker_url, "count": worker_sum})
-                else:
-                    details.append({"worker": worker_url, "error": f"Status {resp.status_code}"})
-            except Exception as e:
-                details.append({"worker": worker_url, "error": str(e)})
-                
-    return {
-        "final_result": total_sum,
-        "message": "Aggregation completed",
-        "breakdown": details
-    }
