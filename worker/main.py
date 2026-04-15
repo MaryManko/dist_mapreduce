@@ -3,6 +3,7 @@ import httpx
 import os
 import asyncio
 import pandas as pd
+import shutil
 
 app = FastAPI()
 
@@ -34,8 +35,8 @@ async def upload_fragment(file: UploadFile = File(...)):
     return {"message": f"Saved {file.filename}", "path": file_path}
 
 @app.post("/map")
-async def run_map(task_type: str):
-    """Виконує функцію Map над локальними файлами"""
+async def run_map(task_type: str, column: str = "price"):
+    """Виконує Map: або count, або sum по колонці"""
     results = []
     
     for filename in os.listdir(STORAGE_DIR):
@@ -45,10 +46,12 @@ async def run_map(task_type: str):
             
             if task_type == "count":
                 res = len(df)
+            elif task_type == "sum":
+                res = int(df[column].sum())
             
             result_filename = f"map_res_{filename}"
             result_path = os.path.join(STORAGE_DIR, result_filename)
-            
+
             pd.DataFrame([{"result": res}]).to_csv(result_path, index=False)
             results.append(result_filename)
             
@@ -65,3 +68,12 @@ async def get_results():
             all_results.append(int(df['result'].iloc[0]))
     
     return {"worker_url": WORKER_URL, "results": all_results}
+
+@app.delete("/cleanup")
+def cleanup_storage():
+    """Видаляє всі файли в папці storage"""
+    for filename in os.listdir(STORAGE_DIR):
+        file_path = os.path.join(STORAGE_DIR, filename)
+        if os.path.isfile(file_path):
+            os.remove(file_path)
+    return {"message": "Storage cleared"}

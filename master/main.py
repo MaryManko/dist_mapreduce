@@ -40,19 +40,54 @@ async def run_map_across_cluster(task_type: str = "count"):
                 responses.append({"worker": worker_url, "error": str(e)})
     return {"message": "Cluster Map initiated", "details": responses}
 
+@app.post("/run-map")
+async def run_map_across_cluster(task_type: str = "sum", column: str = "price"):
+    responses = []
+    async with httpx.AsyncClient() as client:
+        for worker_url in workers:
+            try:
+                resp = await client.post(f"{worker_url}/map?task_type={task_type}&column={column}")
+                
+                if resp.status_code == 200:
+                    responses.append(resp.json())
+                else:
+                    responses.append({"worker": worker_url, "error": f"Worker returned {resp.status_code}"})
+            except Exception as e:
+                responses.append({"worker": worker_url, "error": str(e)})
+    
+    return {"message": "Cluster Map initiated", "details": responses}
+
+@app.delete("/reset")
+async def reset_cluster():
+    global file_metadata
+    file_metadata = {}
+    async with httpx.AsyncClient() as client:
+        for worker_url in workers:
+            try:
+                await client.delete(f"{worker_url}/cleanup")
+            except:
+                pass
+    return {"message": "Cluster reset successful"}
+
 @app.post("/run-reduce")
 async def run_reduce_across_cluster():
     total_sum = 0
     details = []
     
+    if not workers:
+        return {"final_result": 0, "message": "No active workers", "breakdown": []}
+
     async with httpx.AsyncClient() as client:
         for worker_url in workers:
             try:
                 resp = await client.get(f"{worker_url}/get-results")
-                data = resp.json()
-                worker_sum = sum(data["results"])
-                total_sum += worker_sum
-                details.append({"worker": worker_url, "count": worker_sum})
+                if resp.status_code == 200:
+                    data = resp.json()
+                    worker_sum = sum(data.get("results", []))
+                    total_sum += worker_sum
+                    details.append({"worker": worker_url, "count": worker_sum})
+                else:
+                    details.append({"worker": worker_url, "error": f"Status {resp.status_code}"})
             except Exception as e:
                 details.append({"worker": worker_url, "error": str(e)})
                 

@@ -62,8 +62,11 @@ def main():
     up = subparsers.add_parser("upload")
     up.add_argument("file", help="Шлях до CSV файлу")
 
-    run_map = subparsers.add_parser("map", help="Запустити фазу Map на кластері")
-    run_map.add_argument("--task", default="count", help="Тип завдання")
+    run_map = subparsers.add_parser("map")
+    run_map.add_argument("--task", default="sum")
+    run_map.add_argument("--col", default="price")
+
+    subparsers.add_parser("reset")
 
     subparsers.add_parser("reduce", help="Зібрати результати з усього кластера")
 
@@ -74,13 +77,19 @@ def main():
     elif args.command == "upload":
         upload_file(args.file)
     elif args.command == "map":
-        resp = httpx.post(f"{MASTER_URL}/run-map", params={"task_type": args.task})
-        print("Команда надіслана кластеру:", resp.json())
+        resp = httpx.post(f"{MASTER_URL}/run-map", params={"task_type": args.task, "column": args.col})
+        print("Команда надіслана:", resp.json())
+    elif args.command == "reset":
+        resp = httpx.delete(f"{MASTER_URL}/reset")
+        print("Кластер очищено:", resp.json())
     elif args.command == "reduce":
-        resp = httpx.post(f"{MASTER_URL}/run-reduce")
-        result = resp.json()
-        print(f"ФІНАЛЬНИЙ РЕЗУЛЬТАТ: {result['final_result']}")
-        print(f"Деталі по воркерах: {result['breakdown']}")
+        try:
+            resp = httpx.post(f"{MASTER_URL}/run-reduce")
+            result = resp.json()
+            print(f"ФІНАЛЬНИЙ РЕЗУЛЬТАТ: {result.get('final_result', 'Помилка')}")
+            print(f"Деталі по воркерах: {result.get('breakdown', [])}")
+        except Exception as e:
+            print(f"Помилка при виконанні Reduce: {e}")
 
 if __name__ == "__main__":
     main()

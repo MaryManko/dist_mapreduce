@@ -1,5 +1,5 @@
-id,name
-1,Maria
-2,Ivan
-3,Oleg
-4,Anna
+item,category,price
+coffee,food,250
+laptop,electronics,30000
+water,food,20
+phone,electronics,15000
