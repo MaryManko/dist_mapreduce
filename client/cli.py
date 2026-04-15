@@ -65,6 +65,8 @@ def main():
     run_map = subparsers.add_parser("map", help="Запустити фазу Map на кластері")
     run_map.add_argument("--task", default="count", help="Тип завдання")
 
+    subparsers.add_parser("reduce", help="Зібрати результати з усього кластера")
+
     args = parser.parse_args()
 
     if args.command == "status":
@@ -74,6 +76,11 @@ def main():
     elif args.command == "map":
         resp = httpx.post(f"{MASTER_URL}/run-map", params={"task_type": args.task})
         print("Команда надіслана кластеру:", resp.json())
+    elif args.command == "reduce":
+        resp = httpx.post(f"{MASTER_URL}/run-reduce")
+        result = resp.json()
+        print(f"ФІНАЛЬНИЙ РЕЗУЛЬТАТ: {result['final_result']}")
+        print(f"Деталі по воркерах: {result['breakdown']}")
 
 if __name__ == "__main__":
     main()

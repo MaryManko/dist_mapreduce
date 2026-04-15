@@ -39,3 +39,25 @@ async def run_map_across_cluster(task_type: str = "count"):
             except Exception as e:
                 responses.append({"worker": worker_url, "error": str(e)})
     return {"message": "Cluster Map initiated", "details": responses}
+
+@app.post("/run-reduce")
+async def run_reduce_across_cluster():
+    total_sum = 0
+    details = []
+    
+    async with httpx.AsyncClient() as client:
+        for worker_url in workers:
+            try:
+                resp = await client.get(f"{worker_url}/get-results")
+                data = resp.json()
+                worker_sum = sum(data["results"])
+                total_sum += worker_sum
+                details.append({"worker": worker_url, "count": worker_sum})
+            except Exception as e:
+                details.append({"worker": worker_url, "error": str(e)})
+                
+    return {
+        "final_result": total_sum,
+        "message": "Aggregation completed",
+        "breakdown": details
+    }
