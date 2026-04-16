@@ -105,9 +105,31 @@ async def get_results(job_id: str):
 
 @app.delete("/cleanup")
 def cleanup_storage():
-    
-    for filename in os.listdir(STORAGE_DIR):
-        file_path = os.path.join(STORAGE_DIR, filename)
-        if os.path.isfile(file_path):
-            os.remove(file_path)
-    return {"message": "Storage cleared"}
+    try:
+        removed = 0
+        for filename in os.listdir(STORAGE_DIR):
+            file_path = os.path.join(STORAGE_DIR, filename)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+                removed += 1
+        logger.info(f"Очищено {removed} файлів")
+        return {"message": f"Storage cleared. Removed {removed} files"}
+    except Exception as e:
+        logger.error(f"Помилка при очищенні: {e}")
+        return {"error": str(e)}, 500
+
+@app.get("/cleanup-job")
+def cleanup_job_results(job_id: str):
+    try:
+        removed = 0
+        for filename in os.listdir(STORAGE_DIR):
+            if filename.startswith(f"map_res_{job_id}_"):
+                file_path = os.path.join(STORAGE_DIR, filename)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+                    removed += 1
+        logger.info(f"Очищено {removed} результатів job {job_id}")
+        return {"message": f"Cleaned {removed} files for job {job_id}"}
+    except Exception as e:
+        logger.error(f"Помилка при очищенні job {job_id}: {e}")
+        return {"error": str(e)}, 500

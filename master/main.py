@@ -71,8 +71,11 @@ async def run_map_across_cluster(task_type: str = "sum", column: str = "price"):
     job_id = str(int(time.time()))
     responses = []
     
+    async with lock:
+        active_workers = workers.copy()
+    
     async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-        for worker_url in workers:
+        for worker_url in active_workers:
             try:
                 url = f"{worker_url}/map?task_type={task_type}&column={column}&job_id={job_id}"
                 resp = await client.post(url)
@@ -87,10 +90,12 @@ async def run_map_across_cluster(task_type: str = "sum", column: str = "price"):
 async def run_reduce_across_cluster(job_id: str, task_type: str = "sum"):
     final_val = 0.0 if task_type != "max" else -float('inf')
     total_count = 0
-
     
+    async with lock:
+        active_workers = workers.copy()
+
     async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-        for worker_url in workers:
+        for worker_url in active_workers:
             try:
                 resp = await client.get(f"{worker_url}/get-results?job_id={job_id}")
                 if resp.status_code == 200:
@@ -107,16 +112,29 @@ async def run_reduce_across_cluster(job_id: str, task_type: str = "sum"):
 
     if task_type == "mean" and total_count > 0: 
         final_val = final_val / total_count
+    
+    asyncio.create_task(cleanup_map_results(job_id, active_workers))
         
     return {"final_result": final_val, "job_id": job_id, "task": task_type}
+
+async def cleanup_map_results(job_id: str, active_workers: list):
+    await asyncio.sleep(1) 
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for worker_url in active_workers:
+            try:
+                await client.get(f"{worker_url}/cleanup-job?job_id={job_id}")
+                logger.info(f"Очищено результати job {job_id} на {worker_url}")
+            except Exception as e:
+                logger.warning(f"Не вдалося очистити результати job {job_id} на {worker_url}: {e}")
 
 @app.delete("/reset")
 async def reset_cluster():
     async with lock:
         file_metadata.clear()
+        active_workers = workers.copy()
         
     async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-        for worker_url in workers:
+        for worker_url in active_workers:
             try:
                 await client.delete(f"{worker_url}/cleanup")
             except Exception as e:
