@@ -35,8 +35,6 @@ if not os.path.exists(static_dir):
 
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
-
-
 @app.get("/")
 async def index():
     async with lock:
@@ -65,8 +63,6 @@ async def get_metadata():
         metadata_copy = dict(file_metadata)
     return metadata_copy
 
-
-
 @app.post("/run-map")
 async def run_map_across_cluster(task_type: str = "sum", column: str = "price"):
     if task_type not in ["sum", "max", "mean", "count"]:
@@ -92,7 +88,10 @@ async def run_map_across_cluster(task_type: str = "sum", column: str = "price"):
 
 @app.post("/run-reduce")
 async def run_reduce_across_cluster(job_id: str, task_type: str = "sum"):
-    final_val = 0.0 if task_type != "max" else -float('inf')
+    if task_type == "max":
+        final_val = -float('inf')
+    else:
+        final_val = 0.0
     total_count = 0
     
     async with lock:
@@ -114,11 +113,14 @@ async def run_reduce_across_cluster(job_id: str, task_type: str = "sum"):
             except Exception as e:
                 logger.error(f"Помилка збору результатів з {worker_url}: {e}")
 
-    if task_type == "mean" and total_count > 0: 
+    if total_count == 0:
+        return {"final_result": 0, "job_id": job_id, "task": task_type}
+    
+    if task_type == "mean": 
         final_val = final_val / total_count
     
     asyncio.create_task(cleanup_map_results(job_id, active_workers))
-        
+    
     return {"final_result": final_val, "job_id": job_id, "task": task_type}
 
 async def cleanup_map_results(job_id: str, active_workers: list):

@@ -6,7 +6,7 @@ import os
 import re
 
 MASTER_URL = "http://localhost:8000"
-last_job_id = None  
+last_job_id = None
 
 def get_status():
     try:

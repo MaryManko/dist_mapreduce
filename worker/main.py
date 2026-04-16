@@ -40,11 +40,16 @@ def index():
 
 @app.post("/upload")
 async def upload_fragment(file: UploadFile = File(...)):
-    file_path = os.path.join(STORAGE_DIR, file.filename)
-    with open(file_path, "wb") as f:
-        content = await file.read()
-        f.write(content)
-    return {"message": f"Saved {file.filename}", "path": file_path}
+    try:
+        file_path = os.path.join(STORAGE_DIR, file.filename)
+        with open(file_path, "wb") as f:
+            content = await file.read()
+            f.write(content)
+        logger.info(f"Файл завантажено: {file.filename}")
+        return {"message": f"Saved {file.filename}", "path": file_path}
+    except Exception as e:
+        logger.error(f"Помилка при завантаженні: {e}")
+        return {"error": str(e)}, 500
 
 @app.post("/map") 
 async def run_map(task_type: str, job_id: str, column: str = "price"):
@@ -71,7 +76,7 @@ async def run_map(task_type: str, job_id: str, column: str = "price"):
                     res = float(numeric_col.max())
                 elif task_type == "count":
                     res = float(count)
-                else:  # sum, mean
+                else:
                     res = float(numeric_col.sum())
                 total_rows += count
 
@@ -97,12 +102,17 @@ async def get_results(job_id: str):
     prefix = f"map_res_{job_id}_"
     for filename in os.listdir(STORAGE_DIR):
         if filename.startswith(prefix):
-            df = pd.read_csv(os.path.join(STORAGE_DIR, filename))
-
-            all_results.append({
-                "val": float(df['val'].iloc[0]), 
-                "count": int(df['count'].iloc[0])
-            })
+            try:
+                df = pd.read_csv(os.path.join(STORAGE_DIR, filename))
+                if len(df) > 0 and 'val' in df.columns and 'count' in df.columns:
+                    all_results.append({
+                        "val": float(df['val'].iloc[0]), 
+                        "count": int(df['count'].iloc[0])
+                    })
+                else:
+                    logger.warning(f"Невалідні дані в {filename}")
+            except Exception as e:
+                logger.error(f"Помилка при читанні {filename}: {e}")
     return {"results": all_results}
 
 @app.delete("/cleanup")
