@@ -69,8 +69,10 @@ async def run_map(task_type: str, job_id: str, column: str = "price"):
                 count = len(numeric_col)
                 if task_type == "max":
                     res = float(numeric_col.max())
-                else:
-                    res = float(numeric_col.sum()) 
+                elif task_type == "count":
+                    res = float(count)
+                else:  # sum, mean
+                    res = float(numeric_col.sum())
                 total_rows += count
 
             result_filename = f"map_res_{job_id}_{filename}"

@@ -69,7 +69,7 @@ async def get_metadata():
 
 @app.post("/run-map")
 async def run_map_across_cluster(task_type: str = "sum", column: str = "price"):
-    if task_type not in ["sum", "max", "mean"]:
+    if task_type not in ["sum", "max", "mean", "count"]:
         raise HTTPException(status_code=400, detail="Непідтримуваний тип задачі")
 
     job_id = str(int(time.time()))
