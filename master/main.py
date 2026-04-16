@@ -39,7 +39,9 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.get("/")
 async def index():
-    return {"status": "Master is running", "active_workers": workers}
+    async with lock:
+        workers_copy = workers.copy()
+    return {"status": "Master is running", "active_workers": workers_copy}
 
 @app.post("/register")
 async def register_worker(worker_url: str):
@@ -59,7 +61,9 @@ async def record_fragment(filename: str, worker_url: str, fragment_name: str):
 
 @app.get("/metadata")
 async def get_metadata():
-    return file_metadata
+    async with lock:
+        metadata_copy = dict(file_metadata)
+    return metadata_copy
 
 
 
