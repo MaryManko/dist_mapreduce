@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Compute Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --brand: #059669; /* Смарагдовий зелений */
+            --brand-light: #ecfdf5;
+            --bg: #fcfcfc;
+            --card: #ffffff;
+            --text: #064e3b;
+            --text-muted: #6b7280;
+            --border: #f1f5f9;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg); color: var(--text);
+            margin: 0; display: flex; height: 100vh;
+        }
+
+        .sidebar {
+            width: 280px; background: white; border-right: 1px solid var(--border);
+            padding: 32px; display: flex; flex-direction: column; gap: 40px;
+        }
+
+        .logo { font-size: 20px; font-weight: 800; color: var(--brand); display: flex; align-items: center; gap: 10px; text-transform: uppercase; letter-spacing: 1px; }
+
+        .main { flex: 1; padding: 48px; overflow-y: auto; }
+        .container { max-width: 800px; margin: 0 auto; }
+
+        .step-card {
+            background: var(--card); border-radius: 20px; padding: 32px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+            border: 1px solid var(--border); margin-bottom: 24px;
+        }
+
+        h2 { font-size: 16px; font-weight: 700; margin: 0 0 20px 0; display: flex; align-items: center; gap: 10px; color: var(--text-muted); text-transform: uppercase; }
+
+        .file-upload {
+            border: 2px dashed #d1fae5; border-radius: 12px;
+            padding: 40px; text-align: center; cursor: pointer; transition: 0.2s;
+        }
+        .file-upload:hover { border-color: var(--brand); background: var(--brand-light); }
+
+        .btn {
+            padding: 14px 24px; border-radius: 12px; font-weight: 700; cursor: pointer;
+            border: none; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s;
+        }
+        .btn-primary { background: var(--brand); color: white; width: 100%; }
+        .btn-primary:hover { background: #047857; transform: translateY(-1px); box-shadow: 0 10px 15px rgba(5, 150, 105, 0.2); }
+        .btn-secondary { background: var(--brand-light); color: var(--brand); flex: 1; }
+
+        .result-box {
+            background: linear-gradient(135deg, #059669 0%, #064e3b 100%);
+            border-radius: 24px; padding: 48px; color: white; text-align: center; margin-bottom: 32px;
+            box-shadow: 0 20px 25px -5px rgba(5, 150, 105, 0.1);
+        }
+        .result-val { font-size: 64px; font-weight: 800; display: block; margin: 10px 0; }
+        .result-label { opacity: 0.7; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 2px; }
+
+        .console-container { display: none; margin-top: 20px; }
+        .console {
+            background: #064e3b; border-radius: 12px; padding: 20px;
+            font-family: 'Consolas', monospace; font-size: 12px; color: #6ee7b7;
+            height: 180px; overflow-y: auto; border: 1px solid #065f46;
+        }
+        .console-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+
+        .status-pill {
+            background: #ecfdf5; color: #065f46; padding: 8px 16px;
+            border-radius: 12px; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="logo"><i data-lucide="cpu"></i> Compute Engine</div>
+        <nav style="display: flex; flex-direction: column; gap: 16px;">
+            <div class="status-pill" id="cluster-status"><i data-lucide="activity" size="14"></i> Статус...</div>
+            <div id="worker-list" style="font-size: 12px; color: var(--text-muted); padding-left: 10px;"></div>
+        </nav>
+        <button class="btn btn-secondary" onclick="toggleConsole()" style="margin-top: auto;">
+            <i data-lucide="terminal" size="16"></i> Системний лог
+        </button>
+    </div>
+
+    <div class="main">
+        <div class="container">
+            <div class="step-card">
+                <h2><i data-lucide="folder-up"></i> 1. Обробка даних</h2>
+                <div class="file-upload" onclick="document.getElementById('fileInput').click()">
+                    <i data-lucide="database" size="32" style="color: var(--brand); margin-bottom: 12px;"></i>
+                    <div id="fileName" style="font-weight: 700;">Клікніть, щоб обрати CSV</div>
+                    <input type="file" id="fileInput" accept=".csv" hidden onchange="updateFileName()">
+                </div>
+                <button class="btn btn-primary" id="uploadBtn" onclick="uploadFile()" style="margin-top: 24px;">
+                    Розподілити по кластеру
+                </button>
+            </div>
+
+            <div class="result-box">
+                <span id="res-label" class="result-label">Результат обчислень</span>
+                <span id="final-res" class="result-val">0</span>
+                <div style="display: flex; gap: 12px; margin-top: 32px;">
+                    <button class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color: white;" onclick="runTask('sum')">SUM</button>
+                    <button class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color: white;" onclick="runTask('max')">MAX</button>
+                    <button class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color: white;" onclick="runTask('mean')">MEAN</button>
+                </div>
+            </div>
+
+            <div class="console-container" id="consoleWrapper">
+                <div class="console-header">
+                    <span>КЛЮЧОВІ ПОДІЇ СИСТЕМИ</span>
+                    <button onclick="clearLogs()" style="background:none; border:none; color:var(--brand); cursor:pointer; font-weight:700;">ОЧИСТИТИ</button>
+                </div>
+                <div class="console" id="consoleLog"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        
+        function updateFileName() {
+            const file = document.getElementById('fileInput').files[0];
+            if (file) document.getElementById('fileName').innerText = file.name;
+        }
+
+        function toggleConsole() {
+            const w = document.getElementById('consoleWrapper');
+            w.style.display = w.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function addLog(msg) {
+            const logs = document.getElementById('consoleLog');
+            const now = new Date().toLocaleTimeString();
+            logs.innerHTML += `<div><span style="opacity:0.5">[${now}]</span> > ${msg}</div>`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function clearLogs() { document.getElementById('consoleLog').innerHTML = ''; }
+
+        async function checkStatus() {
+            try {
+                const r = await fetch('/');
+                const data = await r.json();
+                const workers = data.active_workers;
+                document.getElementById('cluster-status').innerHTML = `<i data-lucide="activity" size="14"></i> ${workers.length} вузлів онлайн`;
+                document.getElementById('worker-list').innerHTML = workers.map(w => `<div>${w}</div>`).join('');
+                lucide.createIcons();
+            } catch (e) {
+                document.getElementById('cluster-status').innerText = "Сервер недоступний";
+            }
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const btn = document.getElementById('uploadBtn');
+            if (!fileInput.files[0]) return;
+
+            btn.disabled = true; btn.innerText = "Розподіл...";
+            addLog(`Завантаження: ${fileInput.files[0].name}`);
+
+            const text = await fileInput.files[0].text();
+            const lines = text.split('\n').filter(l => l.trim() !== "");
+            const header = lines[0];
+            const dataLines = lines.slice(1);
+            
+            const r = await fetch('/');
+            const data = await r.json();
+            const workers = data.active_workers;
+            const chunkSize = Math.ceil(dataLines.length / workers.length);
+
+            for (let i = 0; i < workers.length; i++) {
+                const chunk = [header, ...dataLines.slice(i * chunkSize, (i + 1) * chunkSize)].join('\n');
+                const port = workers[i].split(':').pop();
+                const formData = new FormData();
+                formData.append('file', new Blob([chunk]), `p${i}.csv`);
+                
+                addLog(`Вузол ${i} (порт ${port}) отримав свій фрагмент`);
+                await fetch(`http://localhost:${port}/upload`, { method: 'POST', body: formData });
+            }
+            addLog("Дані успішно розподілені по кластеру.");
+            btn.disabled = false; btn.innerText = "Розподілити по кластеру";
+        }
+
+        async function runTask(task) {
+            document.getElementById('final-res').innerText = "...";
+            addLog(`Запуск операції ${task.toUpperCase()}...`);
+            
+            await fetch(`/run-map?task_type=${task}`, { method: 'POST' });
+            const resp = await fetch(`/run-reduce?task_type=${task}`, { method: 'POST' });
+            const data = await resp.json();
+            
+            document.getElementById('final-res').innerText = data.final_result.toLocaleString();
+            document.getElementById('res-label').innerText = `Результат ${task.toUpperCase()}`;
+            addLog(`Обчислення завершено. Результат отримано.`);
+        }
+
+        setInterval(checkStatus, 5000);
+        checkStatus();
+    </script>
+</body>
+</html>

@@ -4,8 +4,16 @@ import os
 import asyncio
 import pandas as pd
 import shutil
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 STORAGE_DIR = "storage"
 os.makedirs(STORAGE_DIR, exist_ok=True)
@@ -38,15 +46,16 @@ async def upload_fragment(file: UploadFile = File(...)):
 async def run_map(task_type: str, column: str = "price"):
 
     results = []
-
+    
     for filename in os.listdir(STORAGE_DIR):
-        if filename.endswith(".csv") and "result" not in filename:
+        if filename.endswith(".csv") and "map_res_" not in filename:
             df = pd.read_csv(os.path.join(STORAGE_DIR, filename))
             
             res_sum = float(df[column].sum())
             res_count = len(df)
             res_max = float(df[column].max())
 
+            # Визначаємо результат згідно задачі
             if task_type == "sum" or task_type == "mean":
                 res = res_sum
             elif task_type == "max":
@@ -55,7 +64,8 @@ async def run_map(task_type: str, column: str = "price"):
                 res = float(res_count)
             
             result_filename = f"map_res_{filename}"
-            pd.DataFrame([{"result": res, "count": res_count}]).to_csv(
+            # ТУТ: записуємо в 'val'
+            pd.DataFrame([{"val": res, "count": res_count}]).to_csv(
                 os.path.join(STORAGE_DIR, result_filename), index=False
             )
             results.append(result_filename)
@@ -69,8 +79,9 @@ async def get_results():
     for filename in os.listdir(STORAGE_DIR):
         if filename.startswith("map_res_"):
             df = pd.read_csv(os.path.join(STORAGE_DIR, filename))
+            # ТУТ БУЛА ПОМИЛКА: замінено 'result' на 'val'
             all_results.append({
-                "val": float(df['result'].iloc[0]),
+                "val": float(df['val'].iloc[0]),
                 "count": int(df['count'].iloc[0])
             })
     return {"worker_url": WORKER_URL, "results": all_results}

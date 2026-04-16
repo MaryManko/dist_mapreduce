@@ -1,11 +1,31 @@
 from fastapi import FastAPI
 import httpx
 import logging
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+import os
+from fastapi.middleware.cors import CORSMiddleware
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Rodentia.Master")
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+static_dir = os.path.join(current_dir, "static")
+
+if not os.path.exists(static_dir):
+    os.makedirs(static_dir)
+    logger.info(f"Папка {static_dir} була створена автоматично")
+
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 workers = []
 file_metadata = {}
@@ -70,7 +90,7 @@ async def run_reduce_across_cluster(task_type: str = "sum"):
                 if resp.status_code == 200:
                     worker_data = resp.json().get("results", [])
                     for res in worker_data:
-                        val = res["val"]
+                        val = res["val"]   # Мастер очікує 'val'
                         count = res["count"]
                         
                         if task_type == "max":
@@ -80,7 +100,7 @@ async def run_reduce_across_cluster(task_type: str = "sum"):
                         total_count += count
                     
                     details.append({"worker": worker_url, "status": "ok"})
-                    await client.delete(f"{worker_url}/cleanup") 
+
             except Exception as e:
                 logger.error(f"Error on {worker_url}: {e}")
     
@@ -100,3 +120,12 @@ async def reset_cluster():
             except Exception:
                 pass
     return {"message": "Cluster reset successful"}
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def get_dashboard():
+    index_path = os.path.join(static_dir, "index.html")
+    try:
+        with open(index_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return f"Помилка: Файл index.html не знайдено за шляхом {index_path}!"

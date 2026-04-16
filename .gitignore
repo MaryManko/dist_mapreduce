@@ -1,8 +1,18 @@
+# --- Твої базові налаштування ---
 __pycache__/
 *.py[cod]
 *$py.class
 .venv/
 .env
+.DS_Store
+
 worker1_data/
 worker2_data/
-.DS_Store
+storage/
+**/storage/
+
+.vscode/
+.idea/
+*.log
+
+.dockerignore
