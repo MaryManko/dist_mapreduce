@@ -6,9 +6,9 @@ import os
 import re
 
 MASTER_URL = "http://localhost:8000"
+last_job_id = None  
 
 def get_status():
-    """Перевірка статусу кластера та списку активних воркерів"""
     try:
         response = httpx.get(f"{MASTER_URL}/", timeout=5.0)
         print("Статус кластера:", response.json())
@@ -16,9 +16,14 @@ def get_status():
         print(f"Помилка зв'язку з Мастером: {e}")
 
 def upload_file(file_path: str):
-    """Розбиття великого файлу та розподіл чанків по воркерах"""
+
     try:
-        resp = httpx.get(f"{MASTER_URL}/")
+        try:
+            resp = httpx.get(f"{MASTER_URL}/", timeout=5.0)
+        except httpx.ConnectError:
+            print(f"Не можу підключитися до мастера на {MASTER_URL}")
+            return
+        
         workers = resp.json().get("active_workers", [])
         
         if not workers:
@@ -49,18 +54,29 @@ def upload_file(file_path: str):
             
             try:
                 worker_resp = httpx.post(f"{external_worker_url}/upload", files=files, timeout=10.0)
-                print(f"✅ Шматок {i} успішно надіслано на {worker_url}")
+                if worker_resp.status_code != 200:
+                    print(f"Помилка: воркер {worker_url} повернув статус {worker_resp.status_code}")
+                    continue
+                print(f"Шматок {i} успішно надіслано на {worker_url}")
 
-                httpx.post(f"{MASTER_URL}/record_fragment", params={
+                record_resp = httpx.post(f"{MASTER_URL}/record_fragment", params={
                     "filename": os.path.basename(file_path),
                     "worker_url": worker_url,
                     "fragment_name": f"part_{i}.csv"
                 })
+                if record_resp.status_code != 200:
+                    print(f"Помилка при записі метаданих: статус {record_resp.status_code}")
+            except httpx.TimeoutException:
+                print(f"Таймаут при завантаженні на {worker_url}")
             except Exception as e:
-                print(f"❌ Помилка при завантаженні на воркер {worker_url}: {e}")
+                print(f"Помилка при завантаженні на воркер {worker_url}: {e}")
 
     except FileNotFoundError:
         print(f"Помилка: Файл '{file_path}' не знайдено.")
+    except pd.errors.EmptyDataError:
+        print(f"Помилка: Файл '{file_path}' порожній.")
+    except pd.errors.ParserError as e:
+        print(f"Помилка при парсингу CSV: {e}")
     except Exception as e:
         print(f"Критична помилка при завантаженні: {e}")
 
@@ -91,20 +107,55 @@ def main():
         upload_file(args.file)
     
     elif args.command == "map":
-        resp = httpx.post(f"{MASTER_URL}/run-map", params={"task_type": args.task, "column": args.col})
-        print("Мастер прийняв задачу Map:", resp.json())
+        global last_job_id
+        try:
+            resp = httpx.post(f"{MASTER_URL}/run-map", params={"task_type": args.task, "column": args.col}, timeout=30.0)
+            if resp.status_code != 200:
+                print(f"Помилка: мастер повернув статус {resp.status_code}")
+                print(f"Детальна інформація: {resp.text}")
+                return
+            data = resp.json()
+            last_job_id = data.get("job_id")
+            print("Мастер прийняв задачу Map:", data)
+            print(f"Job ID: {last_job_id}")
+        except httpx.ConnectError:
+            print(f"Не можу підключитися до мастера на {MASTER_URL}")
+        except httpx.TimeoutException:
+            print(f"Таймаут обчислення на мастері (операція можливо все ще виконується)")
+        except Exception as e:
+            print(f"Помилка при виконанні Map: {e}")
     
     elif args.command == "reduce":
         try:
-            resp = httpx.post(f"{MASTER_URL}/run-reduce", params={"task_type": args.task})
-            result = resp.json()
-            print(f"ФІНАЛЬНИЙ РЕЗУЛЬТАТ ({result.get('task')}): {result.get('final_result')}")
+            if last_job_id is None:
+                print("Помилка: спочатку запустіть 'map', щоб отримати job_id")
+            else:
+                resp = httpx.post(f"{MASTER_URL}/run-reduce", params={"task_type": args.task, "job_id": last_job_id}, timeout=30.0)
+                if resp.status_code != 200:
+                    print(f"Помилка: мастер повернув статус {resp.status_code}")
+                    print(f"Детальна інформація: {resp.text}")
+                    return
+                result = resp.json()
+                print(f"ФІНАЛЬНИЙ РЕЗУЛЬТАТ ({result.get('task')}): {result.get('final_result')}")
+        except httpx.ConnectError:
+            print(f"Не можу підключитися до мастера на {MASTER_URL}")
+        except httpx.TimeoutException:
+            print(f"Таймаут обчислення на мастері")
         except Exception as e:
             print(f"Помилка при виконанні Reduce: {e}")
             
     elif args.command == "reset":
-        resp = httpx.delete(f"{MASTER_URL}/reset")
-        print("Кластер очищено:", resp.json())
+        try:
+            resp = httpx.delete(f"{MASTER_URL}/reset", timeout=20.0)
+            if resp.status_code != 200:
+                print(f"Помилка: мастер повернув статус {resp.status_code}")
+                print(f"Детальна інформація: {resp.text}")
+                return
+            print("Кластер очищено:", resp.json())
+        except httpx.ConnectError:
+            print(f"Не можу підключитися до мастера на {MASTER_URL}")
+        except Exception as e:
+            print(f"Помилка при очищенні кластера: {e}")
     
     else:
         parser.print_help()

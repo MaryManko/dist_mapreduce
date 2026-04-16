@@ -8,7 +8,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         :root {
-            --brand: #059669; /* Смарагдовий зелений */
+            --brand: #059669;
             --brand-light: #ecfdf5;
             --bg: #fcfcfc;
             --card: #ffffff;
@@ -190,16 +190,25 @@
         }
 
         async function runTask(task) {
-            document.getElementById('final-res').innerText = "...";
-            addLog(`Запуск операції ${task.toUpperCase()}...`);
-            
-            await fetch(`/run-map?task_type=${task}`, { method: 'POST' });
-            const resp = await fetch(`/run-reduce?task_type=${task}`, { method: 'POST' });
-            const data = await resp.json();
-            
-            document.getElementById('final-res').innerText = data.final_result.toLocaleString();
-            document.getElementById('res-label').innerText = `Результат ${task.toUpperCase()}`;
-            addLog(`Обчислення завершено. Результат отримано.`);
+            const resVal = document.getElementById('final-res');
+            resVal.innerText = "...";
+            addLog(`Ініціалізація операції: ${task.toUpperCase()}`);
+
+            try {
+                const mapResp = await fetch(`/run-map?task_type=${task}`, { method: 'POST' });
+                const mapData = await mapResp.json();
+                const jobId = mapData.job_id; 
+                addLog(`MAP запущено. Job ID: ${jobId}`);
+
+                addLog(`Збір результатів для завдання ${jobId}...`);
+                const redResp = await fetch(`/run-reduce?task_type=${task}&job_id=${jobId}`, { method: 'POST' });
+                const redData = await redResp.json();
+                document.getElementById('final-res').innerText = redData.final_result;
+                addLog(`Успішно! Результат: ${redData.final_result}`);
+            } catch (e) {
+                addLog(`Помилка: ${e.message}`);
+                resVal.innerText = "Error";
+            }
         }
 
         setInterval(checkStatus, 5000);
