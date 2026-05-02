@@ -75,6 +75,33 @@
             background: #ecfdf5; color: #065f46; padding: 8px 16px;
             border-radius: 12px; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px;
         }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .field-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            display: block;
+            text-transform: uppercase;
+        }
+
+        .field-input {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #d1fae5;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 14px;
+            font-family: inherit;
+            background: #fff;
+        }
     </style>
 </head>
 <body>
@@ -106,11 +133,29 @@
             <div class="result-box">
                 <span id="res-label" class="result-label">Результат обчислень</span>
                 <span id="final-res" class="result-val">0</span>
+                <div class="config-grid">
+                    <div>
+                        <label class="field-label" for="columnInput">Колонка</label>
+                        <input class="field-input" id="columnInput" value="price" placeholder="price">
+                    </div>
+                    <div>
+                        <label class="field-label" for="mapperInput">Mapper Expr (необов'язково)</label>
+                        <input class="field-input" id="mapperInput" placeholder="Напр. series.quantile(0.95)">
+                    </div>
+                    <div>
+                        <label class="field-label" for="reducerInput">Reducer Expr (необов'язково)</label>
+                        <input class="field-input" id="reducerInput" placeholder="Напр. sum(values)/len(values)">
+                    </div>
+                </div>
                 <div style="display: flex; gap: 12px; margin-top: 32px;">
                     <button class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color: white;" onclick="runTask('sum')">SUM</button>
                     <button class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color: white;" onclick="runTask('max')">MAX</button>
                     <button class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color: white;" onclick="runTask('mean')">MEAN</button>
+                    <button class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color: white;" onclick="runTask('count')">COUNT</button>
                 </div>
+                <button class="btn btn-primary" style="margin-top: 12px;" onclick="runCustomTask()">
+                    RUN CUSTOM (Mapper/Reducer Expr)
+                </button>
             </div>
 
             <div class="console-container" id="consoleWrapper">
@@ -175,6 +220,7 @@
             const data = await r.json();
             const workers = data.active_workers;
             const chunkSize = Math.ceil(dataLines.length / workers.length);
+            addLog(`До обробки: ${dataLines.length} рядків`);
 
             for (let i = 0; i < workers.length; i++) {
                 const chunk = [header, ...dataLines.slice(i * chunkSize, (i + 1) * chunkSize)].join('\n');
@@ -191,24 +237,58 @@
 
         async function runTask(task) {
             const resVal = document.getElementById('final-res');
+            const column = document.getElementById('columnInput').value || 'price';
+            const mapperExpr = document.getElementById('mapperInput').value.trim();
+            const reducerExpr = document.getElementById('reducerInput').value.trim();
             resVal.innerText = "...";
             addLog(`Ініціалізація операції: ${task.toUpperCase()}`);
 
             try {
-                const mapResp = await fetch(`/run-map?task_type=${task}`, { method: 'POST' });
+                const mapParams = new URLSearchParams({
+                    task_type: task,
+                    column: column
+                });
+                if (mapperExpr) mapParams.append('mapper_expr', mapperExpr);
+
+                const mapResp = await fetch(`/run-map?${mapParams.toString()}`, { method: 'POST' });
                 const mapData = await mapResp.json();
+                if (!mapResp.ok) throw new Error(mapData.detail || 'Помилка на етапі MAP');
                 const jobId = mapData.job_id; 
                 addLog(`MAP запущено. Job ID: ${jobId}`);
 
-                addLog(`Збір результатів для завдання ${jobId}...`);
-                const redResp = await fetch(`/run-reduce?task_type=${task}&job_id=${jobId}`, { method: 'POST' });
+                addLog(`Виконується SHUFFLE для ${jobId}...`);
+                const shResp = await fetch(`/run-shuffle?job_id=${jobId}`, { method: 'POST' });
+                const shData = await shResp.json();
+                if (!shResp.ok) throw new Error(shData.detail || 'Помилка на етапі SHUFFLE');
+                addLog(`SHUFFLE завершено. Груп: ${shData.groups_count}`);
+
+                addLog(`Запуск REDUCE для ${jobId}...`);
+                const redParams = new URLSearchParams({
+                    task_type: task,
+                    job_id: jobId
+                });
+                if (reducerExpr) redParams.append('reducer_expr', reducerExpr);
+                const redResp = await fetch(`/run-reduce?${redParams.toString()}`, { method: 'POST' });
                 const redData = await redResp.json();
+                if (!redResp.ok) throw new Error(redData.detail || 'Помилка на етапі REDUCE');
                 document.getElementById('final-res').innerText = redData.final_result;
                 addLog(`Успішно! Результат: ${redData.final_result}`);
             } catch (e) {
                 addLog(`Помилка: ${e.message}`);
                 resVal.innerText = "Error";
             }
+        }
+
+        async function runCustomTask() {
+            const mapperExpr = document.getElementById('mapperInput').value.trim();
+            const reducerExpr = document.getElementById('reducerInput').value.trim();
+
+            if (!mapperExpr && !reducerExpr) {
+                addLog("Вкажіть хоча б один вираз: Mapper Expr або Reducer Expr.");
+                return;
+            }
+
+            await runTask('sum');
         }
 
         setInterval(checkStatus, 5000);
